@@ -7,8 +7,9 @@ import altair as alt
 def buscar_dados_completos(ticker):
     try:
         ativo = yf.Ticker(ticker)
-        df = ativo.history(period="30d").reset_index()
+        df = ativo.history(period="60d")
         if not df.empty:
+            df = df.reset_index()
             return df
         return None
     except Exception:
