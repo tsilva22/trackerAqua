@@ -2,23 +2,27 @@ import yfinance as yf
 import pandas as pd
 import streamlit as st
 import altair as alt
+from datetime import datetime, timedelta
 
 # Função para buscar dados históricos
 def buscar_dados_completos(ticker):
     try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range=60d&interval=1d"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
-        data = response.json()
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://finance.yahoo.com/'
+        }
         
-        # Extração manual dos dados do JSON
-        timestamps = data['chart']['result'][0]['timestamp']
-        prices = data['chart']['result'][0]['indicators']['quote'][0]['close']
+        df = yf.download(ticker, period="60d", interval="1d", proxy=None, progress=False)
         
-        df = pd.DataFrame({'Date': pd.to_datetime(timestamps, unit='s'), 'Close': prices})
-        return df.dropna()
+        if not df.empty:
+            df = df.reset_index()
+            if 'Close' in df.columns:
+                return df[['Date', 'Close']]
+        return None
     except Exception as e:
-        st.error(f"Erro ao coletar {ticker}: Verifique a conexão.")
+        st.sidebar.error(f"Erro no ticker {ticker}: {e}")
         return None
 
 # Configuração da Interface
