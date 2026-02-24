@@ -7,22 +7,15 @@ from datetime import datetime, timedelta
 # Função para buscar dados históricos
 def buscar_dados_completos(ticker):
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://finance.yahoo.com/'
-        }
-        
-        df = yf.download(ticker, period="60d", interval="1d", proxy=None, progress=False)
-        
+        ativo = yf.Ticker(ticker)
+        # Usamos 30d como no código original que você tinha
+        df = ativo.history(period="30d")
         if not df.empty:
             df = df.reset_index()
-            if 'Close' in df.columns:
-                return df[['Date', 'Close']]
+            return df
         return None
     except Exception as e:
-        st.sidebar.error(f"Erro no ticker {ticker}: {e}")
+        print(f"Erro ao buscar {ticker}: {e}")
         return None
 
 # Configuração da Interface
