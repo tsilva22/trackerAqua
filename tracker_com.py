@@ -75,7 +75,7 @@ for i, (nome, df) in enumerate(dados_hist.items()):
 
 # --- Seção 2: Gráficos de Tendência com Altair (Eixo Dinâmico) ---
 st.markdown("---")
-st.subheader("📈 Tendência Histórica (Eixo Focado na Variação)")
+st.subheader("📈 Tendência Histórica")
 
 nomes_insumos = [n for n in dados_hist.keys() if n != "Dolar"]
 abas = st.tabs(nomes_insumos)
