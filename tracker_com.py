@@ -6,20 +6,19 @@ import altair as alt
 # Função para buscar dados históricos
 def buscar_dados_completos(ticker):
     try:
-        import requests
-        session = requests.Session()
-        session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        })
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range=60d&interval=1d"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        data = response.json()
         
-        ativo = yf.Ticker(ticker, session=session)
-        df = ativo.history(period="60d")
+        # Extração manual dos dados do JSON
+        timestamps = data['chart']['result'][0]['timestamp']
+        prices = data['chart']['result'][0]['indicators']['quote'][0]['close']
         
-        if not df.empty:
-            return df.reset_index()
-        return None
+        df = pd.DataFrame({'Date': pd.to_datetime(timestamps, unit='s'), 'Close': prices})
+        return df.dropna()
     except Exception as e:
-        print(f"Erro no ticker {ticker}: {e}")
+        st.error(f"Erro ao coletar {ticker}: Verifique a conexão.")
         return None
 
 # Configuração da Interface
