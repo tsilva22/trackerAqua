@@ -11,12 +11,12 @@ Abaixo, apresentamos as principais visualizações do dashboard, demonstrando as
 ### 📈 Aba 1: Tendências & Insights
 Esta visualização foca na evolução histórica dos preços dos insumos selecionados, acompanhada de um resumo executivo com alertas baseados em desvios da média e dados de volatilidade.
 
-![Aba de Tendências e Insights](./img/tendencia.jpeg.jpeg)
+![Aba de Tendências e Insights](./img/tendencia.jpeg)
 
 ### 🧬 Aba 2: Análise de Correlação
 Nesta seção, é possível visualizar a matriz de correlação dinâmica. Ela é fundamental para entender como os preços de diferentes componentes se movem em conjunto, auxiliando na gestão de risco de formulação.
 
-![Matriz de Correlação](./img/correlacao.jpeg.jpeg)
+![Matriz de Correlação](./img/correlacao.jpeg)
 
 ### 📋 Aba 3: Dados Brutos
 Acesso direto às séries temporais processadas, permitindo a exploração detalhada dos dados numéricos que alimentam as visualizações e análises do sistema.
