@@ -40,6 +40,17 @@ def buscar_dados_yf(ticker):
 st.set_page_config(page_title="AgroTicker: Intelligence", layout="wide", page_icon="🐟")
 st.title("🐟 AgroTicker Analytics")
 st.markdown("Dashboard estratégico com proteção de cache contra bloqueios de IP.")
+with st.expander("ℹ️ Nota sobre a disponibilidade dos dados"):
+    st.info("""
+    Este dashboard utiliza a API pública do Yahoo Finance. 
+    Devido a restrições de IP em servidores de nuvem (Streamlit Cloud), o carregamento dos dados 
+    pode sofrer instabilidades temporárias. 
+    
+    **Caso os gráficos não carreguem:**
+    1. Tente clicar no botão **Resetar Dados** na barra lateral.
+    2. Atualize a página (F5).
+    3. Consulte os prints no [Repositório do GitHub](SEU_LINK_AQUI) para visualizar a interface funcional.
+    """)
 
 # --- SIDEBAR ---
 st.sidebar.header("🛡️ Parâmetros")

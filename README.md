@@ -1,6 +1,6 @@
 # 🐟 AgroTicker: Monitor de Commodities para Nutrição Aquícola
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](SEU_LINK_AQUI)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)] https://trackeraqua-8pwtjrsxb8b6ftrvwovvku.streamlit.app/
 
 Sistema inteligente para monitoramento estratégico de insumos, desenvolvido para suporte à decisão na indústria de nutrição animal. O projeto automatiza a coleta, tratamento e visualização de dados de bolsas globais (CBOT/CME), normalizando-os para a realidade do mercado brasileiro.
 
