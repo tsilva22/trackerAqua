@@ -1,97 +1,184 @@
-import yfinance as yf
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import yfinance as yf
 import altair as alt
-from datetime import datetime, timedelta
+from datetime import datetime
+import time
 
-# Função para buscar dados históricos
-def buscar_dados_completos(ticker):
+# --- CONFIGURAÇÃO E MOTOR DE BUSCA ---
+dict_tickers = {
+    "Milho": "CORN", 
+    "Soja": "SOYB", 
+    "Trigo": "WEAT",
+    "Farelo Soja": "ZM=F",  # Contrato Futuro contínuo de Farelo
+    "Óleo Soja": "ZL=F",    # Contrato Futuro contínuo de Óleo
+    "Petróleo (Brent)": "BZ=F", # Importante para custo de frete
+    "Açúcar": "CANE",
+    "Dólar": "USDBRL=X"
+}
+
+# ttl=3600 significa que ele só vai na internet 1 vez por hora (evita ban de IP)
+@st.cache_data(ttl=3600, show_spinner=False)
+def buscar_dados_yf(ticker):
     try:
-        ativo = yf.Ticker(ticker)
-        # Usamos 30d como no código original que você tinha
-        df = ativo.history(period="30d")
-        if not df.empty:
-            df = df.reset_index()
+        # Busca 1 ano de dados
+        ticker_obj = yf.Ticker(ticker)
+        data = ticker_obj.history(period="1y")
+        
+        if not data.empty:
+            df = data[['Close']].reset_index()
+            # Garante que a coluna Date seja datetime e Close seja float
+            df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
+            df['Close'] = df['Close'].astype(float)
             return df
-        return None
     except Exception as e:
         print(f"Erro ao buscar {ticker}: {e}")
         return None
+    return None
 
-# Configuração da Interface
-st.set_page_config(page_title="AgroTicker Pro", layout="wide")
-st.title("🐟 Monitor de Commodities para Aquicultura")
+# --- INTERFACE ---
+st.set_page_config(page_title="AgroTicker: Intelligence", layout="wide", page_icon="🐟")
+st.title("🐟 AgroTicker Analytics")
+st.markdown("Dashboard estratégico com proteção de cache contra bloqueios de IP.")
 
-# --- Sidebar (Menu Lateral) ---
-st.sidebar.header("Configurações")
-unidade = st.sidebar.radio("Selecione a Unidade de Exibição:", 
-                           ("Global (US cents/Bushel)", "Brasil (R$/Tonelada)"))
+# --- SIDEBAR ---
+st.sidebar.header("🛡️ Parâmetros")
+unidade_sel = st.sidebar.selectbox("Unidade de Medida:", 
+    ["R$ / Tonelada (Brasil)", "R$ / Saca 60kg (Brasil)", "US$ / Bushel (Chicago)", "US$ / Tonelada (Global)"])
 
-st.sidebar.markdown("---")
-st.sidebar.info("Dashboard focado em commodities de bolsa para composição de custo de ração.")
+insumos_disponiveis = [k for k in dict_tickers.keys() if k != "Dólar"]
+insumos_selecionados = st.sidebar.multiselect(
+    "Filtrar Insumos:",
+    options=insumos_disponiveis,
+    default=insumos_disponiveis
+)
+janela = st.sidebar.slider("Janela de Visualização (Dias):", 7, 180, 60)
 
-dict_tickers = {
-    "Milho": "ZC=F",
-    "Soja": "ZS=F",
-    "Óleo de Soja": "ZL=F",
-    "Farelo de Soja": "ZM=F",
-    "Aveia": "ZO=F",
-    "Dolar": "USDBRL=X"
-}
+if st.sidebar.button("♻️ Forçar Atualização de Dados"):
+    st.cache_data.clear()
+    st.rerun()
 
-# Busca de dados
-with st.spinner('Atualizando cotações do mercado...'):
-    dados_hist = {nome: buscar_dados_completos(tk) for nome, tk in dict_tickers.items()}
+# --- PROCESSAMENTO ---
+with st.spinner('Lendo dados do cache (Proteção de IP ativa)...'):
+    dados_hist = {}
+    for nome, tk in dict_tickers.items():
+        dados_hist[nome] = buscar_dados_yf(tk)
+        # Pequena pausa entre requisições apenas na primeira vez (quando não há cache)
+        # time.sleep(0.5) 
 
-# Valor do dólar
-dolar = dados_hist['Dolar']['Close'].iloc[-1] if dados_hist['Dolar'] is not None else 5.18
+# Lógica do Dólar
+df_dolar = dados_hist.get('Dólar')
+dolar_atual = float(df_dolar['Close'].iloc[-1]) if isinstance(df_dolar, pd.DataFrame) else 5.25
 
-# --- Seção 1: Métricas Principais ---
-st.subheader("🌾 Principais Insumos (Cotações Atuais)")
-cols = st.columns(len(dados_hist) - 1)
+# Lógica de Conversão
+def converter(valor_usd, nome, unidade):
+    if "R$ / Tonelada" in unidade:
+        f = 39.36 if nome == "Milho" else 36.74
+        return float(valor_usd) * dolar_atual * f
+    if "R$ / Saca" in unidade:
+        f = 2.36 if nome == "Milho" else 2.20
+        return float(valor_usd) * dolar_atual * f
+    if "US$ / Tonelada" in unidade:
+        f = 39.36 if nome == "Milho" else 36.74
+        return float(valor_usd) * f
+    return float(valor_usd)
 
-for i, (nome, df) in enumerate(dados_hist.items()):
-    if nome == "Dolar": continue
-    
-    col = cols[i]
-    if df is not None:
-        v_atual = df['Close'].iloc[-1]
-        v_ant = df['Close'].iloc[-2]
-        delta = v_atual - v_ant
+# --- MÉTRICAS ---
+st.subheader(f"📊 Mercado em Tempo Real ({unidade_sel})")
+cols = st.columns(len(insumos_disponiveis))
+
+for i, nome in enumerate(insumos_disponiveis):
+    with cols[i]:
+        res = dados_hist.get(nome)
+        if isinstance(res, pd.DataFrame) and not res.empty:
+            v_atual = converter(res['Close'].iloc[-1], nome, unidade_sel)
+            v_ant = converter(res['Close'].iloc[-2], nome, unidade_sel)
+            st.metric(nome, f"{v_atual:,.2f}", f"{((v_atual/v_ant)-1)*100:.2f}%")
+        else:
+            st.error(f"{nome} offline")
+
+# --- INTELIGÊNCIA ---
+stats_data = []
+insights = []
+comp_list = []
+
+for nome in insumos_selecionados:
+    df = dados_hist.get(nome)
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        temp = df.copy()
+        temp['Preco_Ajustado'] = temp.apply(lambda x: converter(x['Close'], nome, unidade_sel), axis=1)
+        temp['SMA_15'] = temp['Preco_Ajustado'].rolling(window=15).mean()
+        temp['Insumo'] = nome
+        comp_list.append(temp.tail(janela))
+
+        precos = temp['Preco_Ajustado'].tail(janela)
+        v_atual = precos.iloc[-1]
+        v_media = precos.mean()
+        volatilidade = (precos.std() / v_media) * 100
         
-        if unidade == "Global (US cents/Bushel)":
-            col.metric(nome, f"{v_atual:.2f}", f"{delta:.2f}")
-        else:
-            fator = 39.368 if nome == "Milho" else 36.744
-            v_ton = (v_atual / 100) * dolar * fator
-            d_ton = (delta / 100) * dolar * fator
-            col.metric(nome, f"R$ {v_ton:.2f}/T", f"{d_ton:.2f}")
-    else:
-        col.error(f"{nome}: N/A")
+        stats_data.append({
+            "Insumo": nome,
+            "Média": f"{v_media:,.2f}",
+            "Volatilidade": f"{volatilidade:.2f}%",
+            "Status": "🔴 Alta" if volatilidade > 5 else "🟢 Estável"
+        })
 
-# --- Seção 2: Gráficos de Tendência com Altair (Eixo Dinâmico) ---
+        if v_atual > v_media * 1.05:
+            insights.append(f"⚠️ **{nome}**: Alta de {((v_atual/v_media)-1)*100:.1f}% vs média.")
+        elif v_atual < v_media * 0.95:
+            insights.append(f"✅ **{nome}**: Oportunidade (abaixo da média).")
+
+# --- ABAS ---
 st.markdown("---")
-st.subheader("📈 Tendência Histórica")
+tab1, tab2, tab3 = st.tabs(["📈 Tendências & Insights", "🧬 Análise de Correlação", "📋 Dados Brutos"])
 
-nomes_insumos = [n for n in dados_hist.keys() if n != "Dolar"]
-abas = st.tabs(nomes_insumos)
-
-for aba, nome in zip(abas, nomes_insumos):
-    df = dados_hist[nome]
-    with aba:
-        if df is not None:
-            # Criando gráfico Altair com escala dinâmica (scale=alt.Scale(domainMin=...))
-            # O parâmetro 'zero=False' força o eixo a focar nos dados
-            chart = alt.Chart(df).mark_line(color='#1f77b4', strokeWidth=3).encode(
-                x=alt.X('Date:T', title='Data'),
-                y=alt.Y('Close:Q', title='Preço $USD', scale=alt.Scale(zero=False)),
-                tooltip=['Date', 'Close']
-            ).properties(height=400).interactive()
-            
-            st.altair_chart(chart, use_container_width=True)
+with tab1:
+    col_graph, col_info = st.columns([3, 1])
+    with col_graph:
+        if comp_list:
+            df_grafico = pd.concat(comp_list)
+            base = alt.Chart(df_grafico).encode(x=alt.X('Date:T', title=None), color='Insumo:N')
+            lines = base.mark_line(strokeWidth=3, interpolate='monotone').encode(
+                y=alt.Y('Preco_Ajustado:Q', scale=alt.Scale(zero=False), title="Preço"),
+                tooltip=['Insumo', 'Date', 'Preco_Ajustado']
+            )
+            st.altair_chart(lines.properties(height=450).interactive(bind_y=False), width='stretch')
         else:
-            st.warning(f"Dados históricos indisponíveis para {nome}")
+            st.info("Selecione insumos para visualizar o gráfico.")
+    
+    with col_info:
+        st.subheader("Resumo")
+        for n in insights: st.info(n)
+        if not insights: st.write("Preços operando na média.")
+        st.markdown("---")
+        st.write("**Volatilidade**")
+        if stats_data:
+            st.dataframe(pd.DataFrame(stats_data).set_index("Insumo"))
 
-st.markdown("---")
-st.metric("Câmbio Comercial (Referência)", f"R$ {dolar:.2f}")
-st.caption("Gráficos gerados via Altair com eixo Y dinâmico para melhor visualização da volatilidade.")
+with tab2:
+    st.subheader("🧬 Matriz de Correlação")
+    st.markdown("Entenda como os preços se movem em conjunto.")
+    df_corr_list = []
+    for n in insumos_disponiveis:
+        if isinstance(dados_hist[n], pd.DataFrame):
+            df_temp = dados_hist[n][['Date', 'Close']].rename(columns={'Close': n}).set_index('Date')
+            df_corr_list.append(df_temp)
+    
+    if len(df_corr_list) > 1:
+        df_final_corr = pd.concat(df_corr_list, axis=1).dropna()
+        corr_matrix = df_final_corr.corr().reset_index().melt(id_vars='index')
+        corr_matrix.columns = ['I1', 'I2', 'Corr']
+        
+        heatmap = alt.Chart(corr_matrix).mark_rect().encode(
+            x='I1:N', y='I2:N', 
+            color=alt.Color('Corr:Q', scale=alt.Scale(scheme='viridis')),
+            tooltip=['I1', 'I2', 'Corr']
+        ).properties(height=450)
+        
+        st.altair_chart(heatmap, width='stretch')
+
+with tab3:
+    if comp_list:
+        st.dataframe(pd.concat(comp_list).sort_values(by='Date', ascending=False), width='stretch')
+
+st.caption(f"Dólar Ref: R$ {dolar_atual:.2f} | Cache expira em 1h | {datetime.now().strftime('%H:%M:%S')}")
